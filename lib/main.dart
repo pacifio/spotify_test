@@ -73,24 +73,26 @@ class HomeState extends State<Home> {
             appBar: AppBar(
               title: const Text('SpotifySdk Example'),
               actions: [
-                _connected
-                    ? IconButton(
-                        // onPressed: disconnect,
-                        onPressed: () async {
-                          final isConnected = await SpotifySdk.connectToSpotifyRemote(
-                            clientId: dotenv.env['CLIENT_ID'].toString(),
-                            redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
-                          );
-
-                          print(isConnected);
-                        },
-                        icon: const Icon(Icons.exit_to_app),
-                      )
-                    : Container()
+                IconButton(
+                  // onPressed: disconnect,
+                  onPressed: () async {
+                    final isConnected = await SpotifySdk.connectToSpotifyRemote(
+                      clientId: dotenv.env['CLIENT_ID'].toString(),
+                      redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
+                    );
+                  },
+                  icon: const Icon(Icons.exit_to_app),
+                )
               ],
             ),
             body: _sampleFlowWidget(context),
             bottomNavigationBar: _connected ? _buildBottomBar(context) : null,
+            floatingActionButton: FloatingActionButton(
+              onPressed: () async {
+                final tok = await getAccessToken();
+                getUserPlaylists(tok);
+              },
+            ),
           );
         },
       ),
@@ -162,14 +164,13 @@ class HomeState extends State<Home> {
                   child: const Icon(Icons.settings_remote),
                 ),
                 TextButton(
-                  onPressed: ()async{
+                  onPressed: () async {
                     try {
                       final token = await getAccessToken();
                       _token = token;
                     } on Exception catch (e) {
                       print('hat tere maa ki');
                     }
-                    
                   },
                   child: const Text('get auth token '),
                 ),
@@ -250,8 +251,7 @@ class HomeState extends State<Home> {
                   'Status',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                Text(
-                    crossfadeState?.isEnabled == true ? 'Enabled' : 'Disabled'),
+                Text(crossfadeState?.isEnabled == true ? 'Enabled' : 'Disabled'),
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Text(
@@ -274,11 +274,7 @@ class HomeState extends State<Home> {
             ),
           ],
         ),
-        _loading
-            ? Container(
-                color: Colors.black12,
-                child: const Center(child: CircularProgressIndicator()))
-            : const SizedBox(),
+        _loading ? Container(color: Colors.black12, child: const Center(child: CircularProgressIndicator())) : const SizedBox(),
       ],
     );
   }
@@ -382,8 +378,7 @@ class HomeState extends State<Home> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Playback speed: ${playerState.playbackSpeed}'),
-                Text(
-                    'Progress: ${playerState.playbackPosition}ms/${track.duration}ms'),
+                Text('Progress: ${playerState.playbackPosition}ms/${track.duration}ms'),
               ],
             ),
             Row(
@@ -414,8 +409,7 @@ class HomeState extends State<Home> {
                       'Repeat Mode:',
                     ),
                     DropdownButton<RepeatMode>(
-                      value: RepeatMode
-                          .values[playerState.playbackOptions.repeatMode.index],
+                      value: RepeatMode.values[playerState.playbackOptions.repeatMode.index],
                       items: const [
                         DropdownMenuItem(
                           value: RepeatMode.off,
@@ -571,12 +565,9 @@ class HomeState extends State<Home> {
       setState(() {
         _loading = true;
       });
-      var result = await SpotifySdk.connectToSpotifyRemote(
-          clientId: dotenv.env['CLIENT_ID'].toString(),
-          redirectUrl: dotenv.env['REDIRECT_URL'].toString());
-      setStatus(result
-          ? 'connect to spotify successful'
-          : 'connect to spotify failed');
+      var result =
+          await SpotifySdk.connectToSpotifyRemote(clientId: dotenv.env['CLIENT_ID'].toString(), redirectUrl: dotenv.env['REDIRECT_URL'].toString());
+      setStatus(result ? 'connect to spotify successful' : 'connect to spotify failed');
       setState(() {
         _loading = false;
       });
@@ -638,8 +629,7 @@ class HomeState extends State<Home> {
 
   Future<void> queue() async {
     try {
-      await SpotifySdk.queue(
-          spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
+      await SpotifySdk.queue(spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
     } on PlatformException catch (e) {
       setStatus(e.code, message: e.message);
     } on MissingPluginException {
@@ -681,7 +671,7 @@ class HomeState extends State<Home> {
     }
   }
 
-  Future<void> getUserPlaylists() async {
+  Future<void> getUserPlaylists(String token) async {
     final response = await http.get(
       Uri.parse('https://api.spotify.com/v1/me/playlists'),
       headers: {
@@ -690,9 +680,8 @@ class HomeState extends State<Home> {
     );
 
     if (response.statusCode == 200) {
-      // Parse and work with the playlist data
       final Map<String, dynamic> data = json.decode(response.body);
-      // Handle the data as needed.
+      _logger.d(data);
     } else {
       // Handle errors
       print('Error: ${response.reasonPhrase}');
@@ -801,8 +790,7 @@ class HomeState extends State<Home> {
 
   Future<void> addToLibrary() async {
     try {
-      await SpotifySdk.addToLibrary(
-          spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
+      await SpotifySdk.addToLibrary(spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
     } on PlatformException catch (e) {
       setStatus(e.code, message: e.message);
     } on MissingPluginException {
@@ -814,9 +802,8 @@ class HomeState extends State<Home> {
     try {
       await SpotifySdk.isSpotifyAppActive.then((isActive) {
         final snackBar = SnackBar(
-            content: Text(isActive
-                ? 'Spotify app connection is active (currently playing)'
-                : 'Spotify app connection is not active (currently not playing)'));
+            content: Text(
+                isActive ? 'Spotify app connection is active (currently playing)' : 'Spotify app connection is not active (currently not playing)'));
 
         ScaffoldMessenger.of(context).showSnackBar(snackBar);
       });
