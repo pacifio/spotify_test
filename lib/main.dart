@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:logger/logger.dart';
 import 'package:spotify_sdk/models/connection_status.dart';
@@ -34,17 +36,24 @@ class HomeState extends State<Home> {
   final Logger _logger = Logger(
     //filter: CustomLogFilter(), // custom logfilter can be used to have logs in release mode
     printer: PrettyPrinter(
-      methodCount: 2, // number of method calls to be displayed
-      errorMethodCount: 8, // number of method calls if stacktrace is provided
-      lineLength: 120, // width of the output
-      colors: true, // Colorful log messages
-      printEmojis: true, // Print an emoji for each log message
+      methodCount: 2,
+      // number of method calls to be displayed
+      errorMethodCount: 8,
+      // number of method calls if stacktrace is provided
+      lineLength: 120,
+      // width of the output
+      colors: true,
+      // Colorful log messages
+      printEmojis: true,
+      // Print an emoji for each log message
       printTime: true,
     ),
   );
 
   CrossfadeState? crossfadeState;
   late ImageUri? currentTrackImageUri;
+
+  String? _token;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +75,15 @@ class HomeState extends State<Home> {
               actions: [
                 _connected
                     ? IconButton(
-                        onPressed: disconnect,
+                        // onPressed: disconnect,
+                        onPressed: () async {
+                          final isConnected = await SpotifySdk.connectToSpotifyRemote(
+                            clientId: dotenv.env['CLIENT_ID'].toString(),
+                            redirectUrl: dotenv.env['REDIRECT_URL'].toString(),
+                          );
+
+                          print(isConnected);
+                        },
                         icon: const Icon(Icons.exit_to_app),
                       )
                     : Container()
@@ -145,7 +162,15 @@ class HomeState extends State<Home> {
                   child: const Icon(Icons.settings_remote),
                 ),
                 TextButton(
-                  onPressed: getAccessToken,
+                  onPressed: ()async{
+                    try {
+                      final token = await getAccessToken();
+                      _token = token;
+                    } on Exception catch (e) {
+                      print('hat tere maa ki');
+                    }
+                    
+                  },
                   child: const Text('get auth token '),
                 ),
               ],
@@ -225,7 +250,8 @@ class HomeState extends State<Home> {
                   'Status',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
-                Text(crossfadeState?.isEnabled == true ? 'Enabled' : 'Disabled'),
+                Text(
+                    crossfadeState?.isEnabled == true ? 'Enabled' : 'Disabled'),
                 Padding(
                   padding: const EdgeInsets.only(top: 8.0),
                   child: Text(
@@ -248,7 +274,11 @@ class HomeState extends State<Home> {
             ),
           ],
         ),
-        _loading ? Container(color: Colors.black12, child: const Center(child: CircularProgressIndicator())) : const SizedBox(),
+        _loading
+            ? Container(
+                color: Colors.black12,
+                child: const Center(child: CircularProgressIndicator()))
+            : const SizedBox(),
       ],
     );
   }
@@ -352,7 +382,8 @@ class HomeState extends State<Home> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Playback speed: ${playerState.playbackSpeed}'),
-                Text('Progress: ${playerState.playbackPosition}ms/${track.duration}ms'),
+                Text(
+                    'Progress: ${playerState.playbackPosition}ms/${track.duration}ms'),
               ],
             ),
             Row(
@@ -383,7 +414,8 @@ class HomeState extends State<Home> {
                       'Repeat Mode:',
                     ),
                     DropdownButton<RepeatMode>(
-                      value: RepeatMode.values[playerState.playbackOptions.repeatMode.index],
+                      value: RepeatMode
+                          .values[playerState.playbackOptions.repeatMode.index],
                       items: const [
                         DropdownMenuItem(
                           value: RepeatMode.off,
@@ -539,9 +571,12 @@ class HomeState extends State<Home> {
       setState(() {
         _loading = true;
       });
-      var result =
-          await SpotifySdk.connectToSpotifyRemote(clientId: dotenv.env['CLIENT_ID'].toString(), redirectUrl: dotenv.env['REDIRECT_URL'].toString());
-      setStatus(result ? 'connect to spotify successful' : 'connect to spotify failed');
+      var result = await SpotifySdk.connectToSpotifyRemote(
+          clientId: dotenv.env['CLIENT_ID'].toString(),
+          redirectUrl: dotenv.env['REDIRECT_URL'].toString());
+      setStatus(result
+          ? 'connect to spotify successful'
+          : 'connect to spotify failed');
       setState(() {
         _loading = false;
       });
@@ -603,7 +638,8 @@ class HomeState extends State<Home> {
 
   Future<void> queue() async {
     try {
-      await SpotifySdk.queue(spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
+      await SpotifySdk.queue(
+          spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
     } on PlatformException catch (e) {
       setStatus(e.code, message: e.message);
     } on MissingPluginException {
@@ -642,6 +678,24 @@ class HomeState extends State<Home> {
       setStatus(e.code, message: e.message);
     } on MissingPluginException {
       setStatus('not implemented');
+    }
+  }
+
+  Future<void> getUserPlaylists() async {
+    final response = await http.get(
+      Uri.parse('https://api.spotify.com/v1/me/playlists'),
+      headers: {
+        'Authorization': 'Bearer $token',
+      },
+    );
+
+    if (response.statusCode == 200) {
+      // Parse and work with the playlist data
+      final Map<String, dynamic> data = json.decode(response.body);
+      // Handle the data as needed.
+    } else {
+      // Handle errors
+      print('Error: ${response.reasonPhrase}');
     }
   }
 
@@ -747,7 +801,8 @@ class HomeState extends State<Home> {
 
   Future<void> addToLibrary() async {
     try {
-      await SpotifySdk.addToLibrary(spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
+      await SpotifySdk.addToLibrary(
+          spotifyUri: 'spotify:track:58kNJana4w5BIjlZE2wq5m');
     } on PlatformException catch (e) {
       setStatus(e.code, message: e.message);
     } on MissingPluginException {
@@ -759,8 +814,9 @@ class HomeState extends State<Home> {
     try {
       await SpotifySdk.isSpotifyAppActive.then((isActive) {
         final snackBar = SnackBar(
-            content: Text(
-                isActive ? 'Spotify app connection is active (currently playing)' : 'Spotify app connection is not active (currently not playing)'));
+            content: Text(isActive
+                ? 'Spotify app connection is active (currently playing)'
+                : 'Spotify app connection is not active (currently not playing)'));
 
         ScaffoldMessenger.of(context).showSnackBar(snackBar);
       });
